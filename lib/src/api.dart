@@ -881,6 +881,22 @@ class SbtAuthApi {
     _checkResponse(response);
   }
 
+  /// base64 backup
+  Future<String> base64Backup(
+      Map<String, dynamic> backupInfo,
+      ) async {
+    final data = {
+      'backupInfo': backupInfo,
+    };
+    final response = await http.post(
+      Uri.parse('$_baseUrl/user/back-up:base64'),
+      headers: _headers,
+      body: jsonEncode(data),
+    );
+    final res = _checkResponse(response) as String;
+    return res;
+  }
+
   /// One drive batch backup
   Future<void> oneDriveBatchBackup(
     String code,
