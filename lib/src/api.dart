@@ -426,6 +426,37 @@ class SbtAuthApi {
     _checkResponse(response);
   }
 
+  /// 备份公钥信息
+  Future<void> backupPublicKeyInfoRequest(
+      String encrypted,
+      String keyType,
+      ) async {
+    final params = {
+      'publicKeyBackUpInfo': encrypted,
+      'keyType': keyType,
+    };
+    final response = await http.post(
+      Uri.parse('$_baseUrl/user/public-key/backup'),
+      headers: _headers,
+      body: jsonEncode(params),
+    );
+    _checkResponse(response);
+  }
+
+  /// 查询公钥备份信息
+  Future<List<PublicKeyBackUpInfo>> getPublicKeyBackUpInfo() async {
+    final response = await http.get(
+      Uri.parse('$_baseUrl/user/public-key/query'),
+      headers: _headers,
+    );
+
+    final items = _checkResponse(response) as List<dynamic>;
+
+    return items
+        .map((item) => PublicKeyBackUpInfo.fromMap(item as Map<String, dynamic>))
+        .toList();
+  }
+
   /// Confirm event received
   Future<void> confirmEventReceived(String eventID, String eventType) async {
     final deviceName = await getDeviceName();

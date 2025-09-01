@@ -518,8 +518,8 @@ class SbtAuth {
 
   /// base64 backup
   Future<String> base64Backup(
-      String password,
-      ) async {
+    String password,
+  ) async {
     final backupInfo = await getBackupData(password);
     return api.base64Backup(
       backupInfo,
@@ -597,6 +597,168 @@ class SbtAuth {
     final encrypted = await encryptMsg(local, password.toString());
     await api.approveAuthRequest(deviceName, encrypted, chain.name);
     return password.toString();
+  }
+
+  /// 备份公钥信息
+  Future<void> backupPublicKeyInfo({
+    SbtChain chain = SbtChain.EVM,
+  }) async {
+    if (core == null) throw SbtAuthException('Auth not inited');
+    final local = <String, String?>{
+      'evm': core!.localShare!.privateKey,
+    };
+    if (solanaCore == null) {
+      await init(chain: SbtChain.SOLANA, isLogin: true);
+    }
+    if (solanaCore != null) {
+      local['solana'] = solanaCore?.localShare?.privateKey;
+    }
+    if (bitcoinCore == null) {
+      await init(chain: SbtChain.BITCOIN, isLogin: true);
+    }
+    if (bitcoinCore != null) {
+      local['bitcoin'] = bitcoinCore?.localShare?.privateKey;
+    }
+    if (dogecoinCore == null) {
+      await init(chain: SbtChain.DOGECOIN, isLogin: true);
+    }
+    if (dogecoinCore != null) {
+      local['dogecoin'] = dogecoinCore?.localShare?.privateKey;
+    }
+    if (aptosCore == null) {
+      await init(chain: SbtChain.APTOS, isLogin: true);
+    }
+    if (aptosCore != null) {
+      local['aptos'] = aptosCore?.localShare?.privateKey;
+    }
+    if (tronCore != null) {
+      local['tron'] = tronCore?.localShare?.privateKey;
+    }
+    final encrypted = await encryptMsg(jsonEncode(local), '111111');
+    await api.backupPublicKeyInfoRequest(encrypted, chain.name);
+  }
+
+  // 解密
+  Future<String> decryptInfo(String msg, String password) async {
+    return decryptMsg(msg, password);
+  }
+
+  // 解密并处理备份的公钥信息
+  Future<Map<String, String?>> restorePublicKeyInfo(
+      String encryptedData, String password) async {
+    try {
+      // 解密数据
+      final decryptedJson = await decryptMsg(encryptedData, password);
+
+      // 将JSON字符串解析为Map
+      final Map<String, dynamic> decodedMap =
+          jsonDecode(decryptedJson) as Map<String, dynamic>;
+
+      // 转换为<String, String?>类型并返回
+      return decodedMap.map((key, value) => MapEntry(key, value as String?));
+    } catch (e) {
+      // 处理解密或解析过程中的错误
+      print('解密失败: $e');
+      throw Exception('恢复公钥信息失败: ${e.toString()}');
+    }
+  }
+
+  /// 查询公钥备份信息
+  Future<void> confirmBackupPublicKeyInfo() async {
+    final encryptedFragment = await api.getPublicKeyBackUpInfo();
+    if (encryptedFragment.isEmpty) {
+      return;
+    }
+    // 解密
+    final restoredData = await restorePublicKeyInfo(
+        encryptedFragment.first.publicKeyBackUpInfo, '111111');
+
+    for (String key in restoredData.keys) {
+      String? privateKey;
+      SbtChain chain = SbtChain.EVM;
+      switch (key) {
+        case 'evm':
+          privateKey = restoredData['evm'];
+          chain = SbtChain.EVM;
+          break;
+        case 'solana':
+          privateKey = restoredData['solana'];
+          chain = SbtChain.SOLANA;
+          break;
+        case 'bitcoin':
+          privateKey = restoredData['bitcoin'];
+          chain = SbtChain.BITCOIN;
+          break;
+        case 'dogecoin':
+          privateKey = restoredData['dogecoin'];
+          chain = SbtChain.DOGECOIN;
+          break;
+        case 'aptos':
+          privateKey = restoredData['aptos'];
+          chain = SbtChain.APTOS;
+          break;
+        case 'tron':
+          privateKey = restoredData['tron'];
+          chain = SbtChain.TRON;
+          break;
+      }
+      if (privateKey == null) return;
+
+      final remoteShareInfo = await api.fetchRemoteShare(keyType: chain.name);
+      final localShare = Share(
+        privateKey: privateKey,
+        publicKey: remoteShareInfo.remote.publicKey,
+        extraData: remoteShareInfo.localAux,
+      );
+      final core = getCore(chain);
+      final hash = bytesToHex(
+        hashMessage(ascii.encode(jsonEncode(localShare.toJson()))),
+        include0x: true,
+      );
+      if (hash != remoteShareInfo.localHash) {
+        throw SbtAuthException('Recover failed');
+      }
+      final inited = await core.init(
+        address: remoteShareInfo.address,
+        remote: remoteShareInfo.remote,
+        local: localShare,
+        isTestnet: developMode,
+      );
+      switch (chain) {
+        case SbtChain.EVM:
+          _core = core;
+          break;
+        case SbtChain.SOLANA:
+          _solanaCore = core;
+          break;
+        case SbtChain.BITCOIN:
+          _bitcoinCore = core;
+          break;
+        case SbtChain.DOGECOIN:
+          _dogecoinCore = core;
+          break;
+        case SbtChain.APTOS:
+          _aptosCore = core;
+          break;
+        case SbtChain.NEAR:
+          _nearCore = core;
+          break;
+        case SbtChain.TRON:
+          _tronCore = core;
+          break;
+      }
+      if (!inited) throw SbtAuthException('Init error');
+      await DBUtil.auxBox.put(
+        core.getAddress(isTestnet: developMode),
+        remoteShareInfo.backupAux,
+      );
+      await DBUtil.hashBox.put(
+        core.getAddress(isTestnet: developMode),
+        remoteShareInfo.backupHash,
+      );
+      await _authRequestListener();
+      await api.verifyIdentity(localShare, keyType: chain.name);
+    }
   }
 
   /// Get login QrCode
