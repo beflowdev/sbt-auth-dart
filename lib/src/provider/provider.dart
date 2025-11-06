@@ -28,7 +28,7 @@ const _ethRpc = {
   '0x5': 'https://rpc-product.safematrix.io/json-rpc/http/eth_goerli',
   // Sepolia
   '0xaa36a7': 'https://rpc-product.safematrix.io/json-rpc/http/sepolia',
-  '0x38': 'https://rpc-product.safematrix.io/json-rpc/http/bsc',
+  '0x38': 'https://rpc.ankr.com/bsc/a2a6066b91793df028005a1fe4020bd5377f74e08a9d3958f0c27e74b5a4d71e',
   '0x61': 'https://rpc-product.safematrix.io/json-rpc/http/bsc_chapel',
   // Polygon
   '0x89': 'https://rpc-product.safematrix.io/json-rpc/http/polygon',
